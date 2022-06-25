@@ -7,20 +7,21 @@ type Relation interface {
 
 type Command interface {
 	// AS(alias string) Command
-	// ASC(col string) Command
+	ASC(col ...string) Command
 	// CREATE(entity interface{}) Command
-	// DESC(col string) Command
+	DESC(col ...string) Command
 	FROM(entities ...interface{}) Command
-	GO() (Results, error)
+	GO(prefetch ...int) (Results, error)
 	// INSERT(columns ...string) Command
 	// INSERT_INTO(table interface{}, columns ...string) Command
 	// INTO(entity interface{}) Command
 	JOIN(entity interface{}) Command
-	// LIMIT(count int) Command
-	// OFFSET(count int) Command
+	LIMIT(count int) Command
+	OFFSET(count int) Command
 	ON(statement string, conditions ...interface{}) Command
+	ORDER_BY(ob string) Command
 	PP() string
-	SELECT(columns ...string) Command
+	SELECT(columns ...interface{}) Command
 	// VALUES(values [][]interface{}) Command
 	WHERE(statement string, conditions ...interface{}) Command
 }
@@ -37,6 +38,7 @@ type Results interface {
 	All() []Row
 	Count() int
 	Rows(position int) Row
+	Transfer(v []map[string]interface{}) error
 }
 
 type Row interface {

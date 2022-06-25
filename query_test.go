@@ -49,7 +49,7 @@ func TestExecCommand(t *testing.T) {
 	}
 }
 
-func TestJoinCommand(t *testing.T){
+func TestJoinCommand(t *testing.T) {
 	//use sql -- comment operator to mark where spaces will be added after \t and \n removed
 	sql := `
 		SELECT c.email, c.first_name || ', ' || c.last_name AS name, r.rental_date, f.title--
@@ -90,6 +90,50 @@ func TestSelectCommand(t *testing.T) {
 	s := Xql.SELECT("title").FROM("film").WHERE("film_id = ?", 133)
 	if s.PP() != "SELECT title FROM film WHERE film_id = 133" {
 		t.Log(s.PP())
+		t.Fail()
+	}
+}
+
+func TestLimitCommand(t *testing.T) {
+	q := Xql.SELECT().FROM(actor).LIMIT(5)
+	if q.PP() != "SELECT * FROM actor LIMIT 5" {
+		t.Fail()
+	}
+}
+
+func TestOffsetCommand(t *testing.T) {
+	q := Xql.SELECT().FROM(rental).LIMIT(5).OFFSET(4)
+	if q.PP() != "SELECT * FROM rental LIMIT 5 OFFSET 4" {
+		t.Fail()
+	}
+}
+
+func TestOrderByAscDesc(t *testing.T) {
+	b := Xql.SELECT().FROM(actor)
+	ascending := "SELECT * FROM actor ORDER BY actor_id ASC"
+	descending := "SELECT * FROM actor ORDER BY actor_id DESC"
+
+	q := b.ORDER_BY("actor_id")
+	if q.PP() != "SELECT * FROM actor ORDER BY actor_id" {
+		t.Fail()
+	}
+
+	q = b.ORDER_BY("actor_id ASC")
+	if q.PP() != ascending {
+		t.Fail()
+		t.Log(q.PP())
+	}
+	q = b.ORDER_BY("actor_id").ASC()
+	if q.PP() != ascending {
+		t.Fail()
+	}
+	q = b.ASC("actor_id")
+	if q.PP() != ascending {
+		t.Fail()
+	}
+
+	q = b.DESC("actor_id")
+	if q.PP() != descending {
 		t.Fail()
 	}
 }

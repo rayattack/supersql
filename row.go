@@ -8,11 +8,11 @@ import (
 const TIP = "could not coerece data type to"
 
 type SqlRow struct {
-	data map[string]interface{}
+	datum map[string]interface{}
 }
 
 func (s SqlRow) Column(col string) interface{} {
-	return s.data[col]
+	return s.datum[col]
 }
 
 func (s SqlRow) Scan(dest ...interface{}) error {
@@ -20,7 +20,7 @@ func (s SqlRow) Scan(dest ...interface{}) error {
 }
 
 func (s SqlRow) String(col string) (string, error) {
-	val, ok := s.data[col].(string)
+	val, ok := s.datum[col].(string)
 	if ok {
 		return val, nil
 	}
@@ -28,7 +28,7 @@ func (s SqlRow) String(col string) (string, error) {
 }
 
 func (s SqlRow) Integer(col string) (int, error) {
-	val, ok := s.data[col].(int)
+	val, ok := s.datum[col].(int)
 	if ok {
 		return val, nil
 	}
@@ -36,7 +36,7 @@ func (s SqlRow) Integer(col string) (int, error) {
 }
 
 func (s SqlRow) Boolean(col string) (bool, error) {
-	val, ok := s.data[col].(bool)
+	val, ok := s.datum[col].(bool)
 	if ok {
 		return val, nil
 	}
@@ -44,7 +44,7 @@ func (s SqlRow) Boolean(col string) (bool, error) {
 }
 
 func (s SqlRow) Float(col string) (float64, error) {
-	val, ok := s.data[col].(float64)
+	val, ok := s.datum[col].(float64)
 	if ok {
 		return val, nil
 	}
@@ -52,7 +52,7 @@ func (s SqlRow) Float(col string) (float64, error) {
 }
 
 func (s SqlRow) Map(col string) (map[string]interface{}, error) {
-	val, ok := s.data[col].(map[string]interface{})
+	val, ok := s.datum[col].(map[string]interface{})
 	if ok {
 		return val, nil
 	}
@@ -60,7 +60,7 @@ func (s SqlRow) Map(col string) (map[string]interface{}, error) {
 }
 
 func (s SqlRow) List(col string) ([]interface{}, error) {
-	val, ok := s.data[col].([]interface{})
+	val, ok := s.datum[col].([]interface{})
 	if ok {
 		return val, nil
 	}
@@ -68,17 +68,17 @@ func (s SqlRow) List(col string) ([]interface{}, error) {
 }
 
 func (s SqlRow) Transfer(v interface{}) error {
-	data, _ := json.Marshal(s.data)
-	return json.Unmarshal(data, v)
+	datum, _ := json.Marshal(s.datum)
+	return json.Unmarshal(datum, v)
 }
 
 func populateRow(cols []string, values []interface{}) SqlRow {
-	data := make(map[string]interface{})
+	datum := make(map[string]interface{})
 	for i, column := range cols {
-		data[column] = values[i]
+		datum[column] = values[i]
 	}
 
 	return SqlRow{
-		data: data,
+		datum: datum,
 	}
 }

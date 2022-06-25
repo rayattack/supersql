@@ -21,18 +21,28 @@ type SqlQuery struct {
 	cols []string
 	vals [][]interface{}
 	void bool
+	err  error
 }
 
 //TODO: AS Documentation
 func (q SqlQuery) AS(alias string) Command {
+	if q.err != nil {
+		return q
+	}
 	q.ssql = fmt.Sprintf("%s AS %s ", q.ssql, alias)
 	return &q
 }
 
 //TODO: ASC Documentation
-func (q SqlQuery) ASC(column string) Command {
-	q.ORDER_BY(fmt.Sprintf("%s ORDER BY %s ASC ", q.ssql, column))
-	return &q
+func (q SqlQuery) ASC(ob ...string) Command {
+	if q.err != nil {
+		return q
+	}
+	if ob != nil {
+		return q.ob(fmt.Sprintf("ORDER BY %s ASC", ob[0]))
+	}
+	q.ssql = fmt.Sprintf("%s ASC", q.ssql)
+	return q
 }
 
 //TODO: CLOSE Documentation
@@ -45,9 +55,15 @@ func (q SqlQuery) CLOSE() error {
 }
 
 //TODO: DESC Documentation
-func (q SqlQuery) DESC(column string) Command {
-	q.ORDER_BY(fmt.Sprintf("%s ORDER BY %s DESC ", q.ssql, column))
-	return &q
+func (q SqlQuery) DESC(ob ...string) Command {
+	if q.err != nil {
+		return q
+	}
+	if ob != nil {
+		return q.ob(fmt.Sprintf("ORDER BY %s DESC", ob[0]))
+	}
+	q.ssql = fmt.Sprintf("%s DESC", q.ssql)
+	return q
 }
 
 //Helper function for DRY purposes to optimize inserting records by using pgx.CopyFrom as opposed
@@ -63,6 +79,9 @@ func (q SqlQuery) do(rows [][]interface{}) error {
 
 //TODO: FROM Documentation
 func (q SqlQuery) FROM(entities ...interface{}) Command {
+	if q.err != nil {
+		return q
+	}
 	e := []string{}
 	for _, entity := range entities {
 		t := coerceToString(entity)
@@ -72,8 +91,14 @@ func (q SqlQuery) FROM(entities ...interface{}) Command {
 	return q
 }
 
-//TODO: GO Documentation
-func (q SqlQuery) GO() (Results, error) {
+//Send your expantiated query to the server for execution. If an integer argument is provided
+//then results up to the value specified will be preloaded in an sqlresult object. If the optional
+//integer argument is less than zero i.e. -1, then all results will be loaded and if none is provided
+//then calling next() on the sqlresult and streaming back will be the default behaviour activated.
+func (q SqlQuery) GO(prefetch ...int) (Results, error) {
+	if q.err != nil {
+		return nil, q.err
+	}
 	//i.e. if cols present we are in insert mode
 	if q.cols != nil {
 		return nil, q.do(q.vals)
@@ -98,6 +123,7 @@ func (q SqlQuery) GO() (Results, error) {
 		columns = append(columns, string(column.Name))
 	}
 
+	//Check for streaming flag here and stream (lazy read) as opposed to greedy read
 	rows := []Row{}
 	count := 0
 	for ctrl.Next() {
@@ -115,6 +141,9 @@ func (q SqlQuery) GO() (Results, error) {
 //is called i.e. this will register the value passed in for inversion
 //when q.INTO(...) is invoked
 func (q *SqlQuery) INSERT(columns ...string) Command {
+	if q.err != nil {
+		return q
+	}
 	q.ssql = fmt.Sprintf("(%s)", strings.Join(columns, ", "))
 	return q
 }
@@ -122,6 +151,9 @@ func (q *SqlQuery) INSERT(columns ...string) Command {
 //Responsible for expantiation sql to write or create new records. This command is
 //exactly the same as invoking q.INSERT(...) followed immediately by q.INTO(...)
 func (q SqlQuery) INSERT_INTO(table interface{}, cols ...string) Command {
+	if q.err != nil {
+		return q
+	}
 	t := coerceToString(table)
 
 	if interpolative := len(cols); interpolative > 0 {
@@ -138,7 +170,7 @@ func (q SqlQuery) INSERT_INTO(table interface{}, cols ...string) Command {
 	}
 
 	q.ssql = fmt.Sprintf("INSERT INTO %s", t)
-	return &q
+	return q
 }
 
 //Only use this function if q.INSERT(...) invoked immediately before this
@@ -146,6 +178,9 @@ func (q SqlQuery) INSERT_INTO(table interface{}, cols ...string) Command {
 //and so q.INTO(...) inverts the order autocorrecting q.ssql for further
 //expantiation
 func (q SqlQuery) INTO(table interface{}) Command {
+	if q.err != nil {
+		return q
+	}
 	t := coerceToString(table)
 	q.ssql = fmt.Sprintf("%s %s ", t, q.ssql)
 	return q.INSERT_INTO(fmt.Sprintf("%s %s", t, q.ssql))
@@ -154,41 +189,68 @@ func (q SqlQuery) INTO(table interface{}) Command {
 //Issue a join SQL command to tie entities/tables together. This should always
 //be followed by an invokation of q.ON(...)
 func (q SqlQuery) JOIN(entity interface{}) Command {
+	if q.err != nil {
+		return q
+	}
 	t := coerceToString(entity)
 	q.ssql = fmt.Sprintf("%s JOIN %s", q.ssql, t)
-	return &q
+	return q
 }
 
 //TODO: LIMIT Documentation
 func (q SqlQuery) LIMIT(limit int) Command {
-	q.ssql = fmt.Sprintf("%sLIMIT %d ", q.ssql, limit)
+	if q.err != nil {
+		return q
+	}
+	q.ssql = fmt.Sprintf("%s LIMIT %d", q.ssql, limit)
 	return &q
 }
 
 //TODO: OFFSET Documentation
 func (q SqlQuery) OFFSET(offset int) Command {
+	if q.err != nil {
+		return q
+	}
 	q.ssql = fmt.Sprintf("%s OFFSET %d", q.ssql, offset)
-	return &q
+	return q
 }
 
 //Continuation expantiator for JOIN(...) SQL command. This function provides
 //a simple way to specify how the entities should be joined i.e. what columns across
 //the two entities intersect
 func (q SqlQuery) ON(statement string, conditions ...interface{}) Command {
+	if q.err != nil {
+		return q
+	}
 	q.args = append(q.args, conditions...)
 	q.ssql = fmt.Sprintf("%s ON %s", q.ssql, statement)
-	return &q
+	return q
+}
+
+//Order by helper
+func (q SqlQuery) ob(ob string) Command {
+	if q.err != nil {
+		return q
+	}
+	q.ssql = fmt.Sprintf("%s %s", q.ssql, ob)
+	return q
 }
 
 //TODO: ORDER_BY Documentation
 func (q SqlQuery) ORDER_BY(ob string) Command {
-	q.ssql = fmt.Sprintf("%s %s", q.ssql, ob)
-	return &q
+	if q.err != nil {
+		return q
+	}
+	q.ssql = fmt.Sprintf("%s ORDER BY %s", q.ssql, ob)
+	return q
 }
 
 //(PP = PrettyPrint) Returns whatever sql statement has been expantiated at the point this function
 //is invoked.
 func (q SqlQuery) PP() string {
+	if q.err != nil {
+		return fmt.Sprintf("%s", q.err)
+	}
 	csql := q.ssql
 	for _, arg := range q.args {
 		csql = strings.Replace(csql, "?", fmt.Sprint(arg), 1)
@@ -197,12 +259,30 @@ func (q SqlQuery) PP() string {
 }
 
 //TODO: SELECT Documentation
-func (q SqlQuery) SELECT(fields ...string) Command {
-	q.void = false
-	if len(fields) == 0 {
-		fields = []string{"*"}
+func (q SqlQuery) SELECT(fields ...interface{}) Command {
+	help := "only type string and supersql.Field are allowed arguments"
+	if q.err != nil {
+		return q
 	}
-	q.ssql = fmt.Sprintf("SELECT %s", strings.Join(fields, ", "))
+	var values []string
+	q.void = false
+
+	if len(fields) == 0 {
+		values = []string{"*"}
+	} else {
+		for index, f := range fields {
+			switch field := f.(type) {
+			case string:
+				values = append(values, field)
+			case Field:
+				values = append(values, field.name)
+			default:
+				q.err = fmt.Errorf("found %t as argument no. %d in SELECT statement. %s", f, index, help)
+				return q
+			}
+		}
+	}
+	q.ssql = fmt.Sprintf("SELECT %s", strings.Join(values, ", "))
 	return q
 }
 
@@ -211,12 +291,18 @@ func (q SqlQuery) SELECT(fields ...string) Command {
 //TIP: you can create an alias type and reuse that in your own code to save a few keystrokes i.e.
 //type Vals [][]interface{}
 func (q SqlQuery) VALUES(vals [][]interface{}) Command {
+	if q.err != nil {
+		return q
+	}
 	q.vals = vals
 	return q
 }
 
 //TODO: WHERE Documentation
 func (q SqlQuery) WHERE(statement string, conditions ...interface{}) Command {
+	if q.err != nil {
+		return q
+	}
 	q.args = append(q.args, conditions...)
 	q.ssql = fmt.Sprintf("%s WHERE %s", q.ssql, statement)
 	return q
@@ -246,6 +332,7 @@ func Query(ctx context.Context, dsn string) (*SqlQuery, error) {
 		cols: cols,
 		vals: vals,
 		void: true,
+		err:  nil,
 	}
 	return query, nil
 }
