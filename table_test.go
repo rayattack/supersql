@@ -1,7 +1,6 @@
 package supersql_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rayattack/supersql"
@@ -11,7 +10,6 @@ var (
 	actor                    = supersql.Table("actor")
 	rental supersql.Relation = supersql.Table("rental")
 )
-
 
 func ReadRepository(table supersql.Relation) func(id string) (supersql.Results, error) {
 	return func(id string) (supersql.Results, error) {
@@ -29,11 +27,10 @@ func TestTableHelper(t *testing.T) {
 	if query.PP() != "SELECT * FROM actor WHERE actor_id = 34" {
 		t.Fail()
 	}
-	results, err := query.GO()
+	_, err := query.GO()
 	if err != nil {
 		t.Fail()
 	}
-	fmt.Print(results)
 
 	rental.AS("r")
 	query = Xql.SELECT().FROM(rental.AS())

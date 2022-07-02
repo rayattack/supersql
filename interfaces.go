@@ -8,21 +8,21 @@ type Relation interface {
 type Command interface {
 	// AS(alias string) Command
 	ASC(col ...string) Command
-	// CREATE(entity interface{}) Command
+	CREATE(ddl string) Command
 	DESC(col ...string) Command
 	FROM(entities ...interface{}) Command
 	GO(prefetch ...int) (Results, error)
-	// INSERT(columns ...string) Command
-	// INSERT_INTO(table interface{}, columns ...string) Command
-	// INTO(entity interface{}) Command
+	INSERT(columns ...string) Command
+	INSERT_INTO(table interface{}, columns ...[]string) Command
+	INTO(entity interface{}) Command
 	JOIN(entity interface{}) Command
 	LIMIT(count int) Command
 	OFFSET(count int) Command
 	ON(statement string, conditions ...interface{}) Command
 	ORDER_BY(ob string) Command
 	PP() string
-	SELECT(columns ...interface{}) Command
-	// VALUES(values [][]interface{}) Command
+	SELECT(columns ...string) Command
+	VALUES(values ...[]interface{}) Command
 	WHERE(statement string, conditions ...interface{}) Command
 }
 

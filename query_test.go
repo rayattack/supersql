@@ -2,6 +2,7 @@ package supersql_test
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 	"testing"
@@ -10,6 +11,11 @@ import (
 )
 
 const DSN = "postgres://tester:tester@localhost:5432/dvdrental?sslmode=disable"
+const (
+	age   = "age"
+	name  = "name"
+	email = "email"
+)
 
 var Xql *supersql.SqlQuery
 
@@ -134,6 +140,43 @@ func TestOrderByAscDesc(t *testing.T) {
 
 	q = b.DESC("actor_id")
 	if q.PP() != descending {
+		t.Fail()
+	}
+}
+
+func TestInsert(t *testing.T) {
+	q := Xql.INSERT(name, age, email).INTO(actor)
+	if q.PP() != "INSERT INTO actor (name, age, email)" {
+		t.Fail()
+	}
+
+	old := q.PP()
+
+	vf := func(vals ...interface{}) []interface{} {
+		return vals
+	}
+	q = q.VALUES(vf("Ryan Bryan", 4, "mc@ortserga.com"))
+	if q.PP() != fmt.Sprintf("%s VALUES (?, ?, ?)", old) {
+		t.Fail()
+	}
+}
+
+func TestInsertInto(t *testing.T) {
+	s := Xql.INSERT_INTO("customers (?, ?, ?)", []string{name, age, email})
+	q := Xql.INSERT_INTO(actor, []string{name, age, email}).VALUES([]interface{}{"ab", 4, "cdef"})
+	l := Xql.INSERT_INTO(actor, []string{"name", "nom"}) //consider changing this to slice instead???
+	x := Xql.INSERT(name, age, email).INTO(actor).VALUES([]interface{}{"ab", 5, "cdef"})
+
+	if x.PP() != q.PP() {
+		t.Fail()
+	}
+	if s.PP() != "INSERT INTO customers (name, age, email)" {
+		t.Fail()
+	}
+	if q.PP() != "INSERT INTO actor (name, age, email) VALUES (?, ?, ?)" {
+		t.Fail()
+	}
+	if l.PP() != "INSERT INTO actor (name, nom)" {
 		t.Fail()
 	}
 }
