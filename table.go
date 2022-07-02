@@ -15,20 +15,11 @@ type SqlTable struct {
 	name  string
 	ddl   string
 }
-type SqlField struct{ ddl string }
-
-func Field() Column {
-	return &SqlField{``}
-}
 
 func Table(name string) (table *SqlTable) {
 	table = new(SqlTable)
 	table.name = name
 	return
-}
-
-func (f *SqlField) IS(op string, val interface{}) string {
-	return ""
 }
 
 func (t *SqlTable) AS(alias ...string) string {

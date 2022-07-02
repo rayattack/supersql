@@ -24,3 +24,14 @@ func (r SqlResult) Rows(position int) Row {
 	}
 	return r.rows[position - 1]
 }
+
+//TODO documentation for Transfer
+func (r SqlResult) Transfer(s []map[string]interface{}) error {
+	return nil
+}
+
+// TODO
+// Unlike SqlResults this does not load all results in to memory but works with
+// the Next() paradigm of package sql etc.
+type SqlStream struct {
+}

@@ -30,13 +30,16 @@ func (q SqlQuery) AS(alias string) Command {
 }
 
 //TODO: ASC Documentation
-func (q SqlQuery) ASC(column string) Command {
-	q.ORDER_BY(fmt.Sprintf("%s ORDER BY %s ASC ", q.ssql, column))
-	return &q
+func (q SqlQuery) ASC(ob ...string) Command {
+	if ob != nil {
+		return q.ob(fmt.Sprintf("ORDER BY %s ASC", ob[0]))
+	}
+	q.ssql = fmt.Sprintf("%s ASC", q.ssql)
+	return q
 }
 
 //TODO: CLOSE Documentation
-func (q SqlQuery) CLOSE() error {
+func (q *SqlQuery) CLOSE() error {
 	if q.pool != nil {
 		q.pool.Close()
 		return nil
@@ -44,10 +47,19 @@ func (q SqlQuery) CLOSE() error {
 	return q.conn.Close(q.ctx)
 }
 
+func (q SqlQuery) CREATE(ddl string) Command {
+	q.ssql = ddl
+	q.void = true
+	return q
+}
+
 //TODO: DESC Documentation
-func (q SqlQuery) DESC(column string) Command {
-	q.ORDER_BY(fmt.Sprintf("%s ORDER BY %s DESC ", q.ssql, column))
-	return &q
+func (q SqlQuery) DESC(ob ...string) Command {
+	if ob != nil {
+		return q.ob(fmt.Sprintf("ORDER BY %s DESC", ob[0]))
+	}
+	q.ssql = fmt.Sprintf("%s DESC", q.ssql)
+	return q
 }
 
 //Helper function for DRY purposes to optimize inserting records by using pgx.CopyFrom as opposed
@@ -72,8 +84,11 @@ func (q SqlQuery) FROM(entities ...interface{}) Command {
 	return q
 }
 
-//TODO: GO Documentation
-func (q SqlQuery) GO() (Results, error) {
+//Send your expantiated query to the server for execution. If an integer argument is provided
+//then results up to the value specified will be preloaded in an sqlresult object. If the optional
+//integer argument is less than zero i.e. -1, then all results will be loaded and if none is provided
+//then calling next() on the sqlresult and streaming back will be the default behaviour activated.
+func (q SqlQuery) GO(prefetch ...int) (Results, error) {
 	//i.e. if cols present we are in insert mode
 	if q.cols != nil {
 		return nil, q.do(q.vals)
@@ -98,6 +113,7 @@ func (q SqlQuery) GO() (Results, error) {
 		columns = append(columns, string(column.Name))
 	}
 
+	//Check for streaming flag here and stream (lazy read) as opposed to greedy read
 	rows := []Row{}
 	count := 0
 	for ctrl.Next() {
@@ -114,31 +130,35 @@ func (q SqlQuery) GO() (Results, error) {
 //Only use this function if q.INTO(...) will be invoked immediately after this
 //is called i.e. this will register the value passed in for inversion
 //when q.INTO(...) is invoked
-func (q *SqlQuery) INSERT(columns ...string) Command {
+func (q SqlQuery) INSERT(columns ...string) Command {
+	q.cols = columns
 	q.ssql = fmt.Sprintf("(%s)", strings.Join(columns, ", "))
 	return q
 }
 
 //Responsible for expantiation sql to write or create new records. This command is
 //exactly the same as invoking q.INSERT(...) followed immediately by q.INTO(...)
-func (q SqlQuery) INSERT_INTO(table interface{}, cols ...string) Command {
+func (q SqlQuery) INSERT_INTO(table interface{}, optionalColumns ...[]string) Command {
 	t := coerceToString(table)
 
-	if interpolative := len(cols); interpolative > 0 {
-		q.cols = cols
-		placeholders := strings.Count(t, "?")
-		if placeholders > 0 {
-			for _, col := range cols {
-				t = strings.Replace(t, "?", col, 1)
+	if len(optionalColumns) > 0 {
+		columns := optionalColumns[0]
+		if interpolative := len(columns); interpolative > 0 {
+			q.cols = columns
+			if placeholders := strings.Count(t, "?"); placeholders > 0 {
+				for _, col := range columns {
+					t = strings.Replace(t, "?", col, 1)
+				}
+			} else {
+				t = fmt.Sprintf("%s (%s)", t, strings.Join(columns, ", "))
 			}
+		} else {
+			_, cols, _ := strings.Cut(t, "(")
+			q.cols = strings.Split(cols[:len(cols)-1], ",")
 		}
-	} else {
-		_, colss, _ := strings.Cut(t, "(")
-		q.cols = strings.Split(colss[:len(colss)-1], ",")
 	}
-
 	q.ssql = fmt.Sprintf("INSERT INTO %s", t)
-	return &q
+	return q
 }
 
 //Only use this function if q.INSERT(...) invoked immediately before this
@@ -147,7 +167,7 @@ func (q SqlQuery) INSERT_INTO(table interface{}, cols ...string) Command {
 //expantiation
 func (q SqlQuery) INTO(table interface{}) Command {
 	t := coerceToString(table)
-	q.ssql = fmt.Sprintf("%s %s ", t, q.ssql)
+	//revisit and check correctness
 	return q.INSERT_INTO(fmt.Sprintf("%s %s", t, q.ssql))
 }
 
@@ -156,19 +176,19 @@ func (q SqlQuery) INTO(table interface{}) Command {
 func (q SqlQuery) JOIN(entity interface{}) Command {
 	t := coerceToString(entity)
 	q.ssql = fmt.Sprintf("%s JOIN %s", q.ssql, t)
-	return &q
+	return q
 }
 
 //TODO: LIMIT Documentation
 func (q SqlQuery) LIMIT(limit int) Command {
-	q.ssql = fmt.Sprintf("%sLIMIT %d ", q.ssql, limit)
+	q.ssql = fmt.Sprintf("%s LIMIT %d", q.ssql, limit)
 	return &q
 }
 
 //TODO: OFFSET Documentation
 func (q SqlQuery) OFFSET(offset int) Command {
 	q.ssql = fmt.Sprintf("%s OFFSET %d", q.ssql, offset)
-	return &q
+	return q
 }
 
 //Continuation expantiator for JOIN(...) SQL command. This function provides
@@ -177,13 +197,19 @@ func (q SqlQuery) OFFSET(offset int) Command {
 func (q SqlQuery) ON(statement string, conditions ...interface{}) Command {
 	q.args = append(q.args, conditions...)
 	q.ssql = fmt.Sprintf("%s ON %s", q.ssql, statement)
-	return &q
+	return q
+}
+
+//Order by helper
+func (q SqlQuery) ob(ob string) Command {
+	q.ssql = fmt.Sprintf("%s %s", q.ssql, ob)
+	return q
 }
 
 //TODO: ORDER_BY Documentation
 func (q SqlQuery) ORDER_BY(ob string) Command {
-	q.ssql = fmt.Sprintf("%s %s", q.ssql, ob)
-	return &q
+	q.ssql = fmt.Sprintf("%s ORDER BY %s", q.ssql, ob)
+	return q
 }
 
 //(PP = PrettyPrint) Returns whatever sql statement has been expantiated at the point this function
@@ -208,10 +234,21 @@ func (q SqlQuery) SELECT(fields ...string) Command {
 
 //An array(golang slice) contaning another array(slice) of dynamic values to be used in adding
 //a new record.
-//TIP: you can create an alias type and reuse that in your own code to save a few keystrokes i.e.
-//type Vals [][]interface{}
-func (q SqlQuery) VALUES(vals [][]interface{}) Command {
+//TIP: you can create an alias type and OR an expansion function helper and reuse
+//that in your own code to save a few keystrokes i.e.
+//In the current iteration this code is semantic only i.e. not used as it shortcircuits in
+//the GO() method invokation to use a more performant
+//golang psql specific sql construct. Take a look at the GO method for more details.
+//This might change if more database libraries are supported in another version
+func (q SqlQuery) VALUES(vals ...[]interface{}) Command {
 	q.vals = vals
+	values := []string{}
+	for _, val := range vals {
+		replacement := strings.Repeat("?, ", len(val)-1)
+		replacement = fmt.Sprintf("%s?", replacement)
+		values = append(values, fmt.Sprintf("(%s)", replacement))
+	}
+	q.ssql = fmt.Sprintf("%s VALUES %s", q.ssql, strings.Join(values, ","))
 	return q
 }
 
