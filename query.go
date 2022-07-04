@@ -47,12 +47,6 @@ func (q *SqlQuery) CLOSE() error {
 	return q.conn.Close(q.ctx)
 }
 
-func (q SqlQuery) CREATE(ddl string) Command {
-	q.ssql = ddl
-	q.void = true
-	return q
-}
-
 //TODO: DESC Documentation
 func (q SqlQuery) DESC(ob ...string) Command {
 	if ob != nil {
@@ -220,6 +214,12 @@ func (q SqlQuery) PP() string {
 		csql = strings.Replace(csql, "?", fmt.Sprint(arg), 1)
 	}
 	return csql
+}
+
+func (q SqlQuery) RUN(ddl string) Command {
+	q.ssql = ddl
+	q.void = true
+	return q
 }
 
 //TODO: SELECT Documentation

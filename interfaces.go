@@ -8,7 +8,7 @@ type Relation interface {
 type Command interface {
 	// AS(alias string) Command
 	ASC(col ...string) Command
-	CREATE(ddl string) Command
+	RUN(ddl string) Command
 	DESC(col ...string) Command
 	FROM(entities ...interface{}) Command
 	GO(prefetch ...int) (Results, error)
